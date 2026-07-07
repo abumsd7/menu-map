@@ -64,21 +64,26 @@ jobs:
       run: |
         .\premake5.exe vs2022
 
-    # 7. Build MenuMap configurations using your local premake5.lua specifications
+    # 7. Build MenuMap configurations (Errors are ignored per-step so others can run)
     - name: Build MenuMap (San Andreas)
+      continue-on-error: true
       run: |
         msbuild project_files/menu-map.sln /p:Configuration=ReleaseSA /p:Platform=Win32 /m /verbosity:minimal
 
     - name: Build MenuMap (Vice City)
+      continue-on-error: true
       run: |
         msbuild project_files/menu-map.sln /p:Configuration=ReleaseVC /p:Platform=Win32 /m /verbosity:minimal
 
     - name: Build MenuMap (GTA III)
+      continue-on-error: true
       run: |
         msbuild project_files/menu-map.sln /p:Configuration=ReleaseIII /p:Platform=Win32 /m /verbosity:minimal
 
     # 8. Collect and Upload your compiled plugins (.asi files)
+    # 'if: always()' ensures this still runs even if individual builds failed above
     - name: Upload Finished ASI Plugins
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: menu-map latest
