@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch: # Allows you to manually trigger the build from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
       with:
-        submodules: recursive # Set to true if you are using git submodules
+        submodules: recursive
 
     # 2. Clone the Plugin-SDK dependency
     - name: Checkout Plugin-SDK
@@ -30,28 +30,39 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     # 4. Set up the PLUGIN_SDK_DIR environment variable
-    # Plugin-SDK relies on this environment variable to locate its paths.
     - name: Set Plugin-SDK Environment Variable
       run: |
         echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" >> $GITHUB_ENV
-        # If your premake script expects it as a system variable immediately:
         [Environment]::SetEnvironmentVariable("PLUGIN_SDK_DIR", "${{ github.workspace }}\plugin-sdk", "User")
 
-    # 5. Run Premake to generate Visual Studio 2022 solution files
+    # 5. Compile Plugin-SDK components (Required for your project's 'links' filter)
+    # This generates the static .lib files your project links against.
+    - name: Build Plugin-SDK Libraries
+      run: |
+        msbuild plugin-sdk/plugin_sdk.sln /p:Configuration=Release /p:Platform=Win32 /m
+
+    # 6. Run Premake to generate project files inside "project_files"
     - name: Run Premake
       run: |
         .\premake5.exe vs2022
-      # If your premake5.exe is in a subfolder, change it to: .\path\to\premake5.exe vs2022
 
-    # 6. Build the generated solution via MSBuild
-    - name: Build with MSBuild
+    # 7. Build all three configurations (San Andreas, Vice City, GTA III)
+    - name: Build MenuMap (San Andreas)
       run: |
-        msbuild project_files/menu-map.sln /p:Configuration=Release /p:Platform=Win32
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseSA /p:Platform=Win32 /m
 
-    # 7. Upload the compiled .asi file as an artifact
-    - name: Upload Artifact
+    - name: Build MenuMap (Vice City)
+      run: |
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseVC /p:Platform=Win32 /m
+
+    - name: Build MenuMap (GTA III)
+      run: |
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseIII /p:Platform=Win32 /m
+
+    # 8. Collect and Upload compiled .asi binaries from your target directory
+    - name: Upload Finished ASI Plugins
       uses: actions/upload-artifact@v4
       with:
-        name: MenuMap-Build
+        name: menu-map latest
         path: |
-          **/*.asi
+          output/asi/*.asi
