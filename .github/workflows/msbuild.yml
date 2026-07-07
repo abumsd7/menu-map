@@ -30,7 +30,7 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v3
 
-    # 4. Generate and compile the Release Plugin-SDK Libraries
+    # 4. Generate and compile the Release Plugin-SDK Libraries using standard configuration
     - name: Generate and Build Plugin-SDK Libraries
       shell: cmd
       run: |
@@ -53,18 +53,27 @@ jobs:
         msbuild plugin.sln /property:Configuration=Release /property:Platform="Mixed Platforms" /target:plugin_sa /m /verbosity:minimal
         echo ::groupEnd::
 
-    # 5. Set up the environment variable cleanly for MSBuild across subsequent steps
-    - name: Set Environment Variables
+    # 5. Set up environment variables cleanly and create mock folders to satisfy postbuild commands
+    - name: Set Environment Variables & Create Mock Folders
       shell: powershell
       run: |
+        # Create mock script folders so the post-build copy commands don't crash
+        New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\mock_gta3\scripts"
+        New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\mock_gtavc\scripts"
+        New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\mock_gtasa\scripts"
+        
+        # Inject paths into GITHUB_ENV for global MSBuild reference
         echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "GTA_III_DIR=${{ github.workspace }}\mock_gta3" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "GTA_VC_DIR=${{ github.workspace }}\mock_gtavc" | Out-File -FilePath $env:GITHUB_ENV -Append
+        echo "GTA_SA_DIR=${{ github.workspace }}\mock_gtasa" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    # 6. Run your root Premake to generate your project files
+    # 6. Run your root Premake to generate your project files inside project_files/
     - name: Run Project Premake
       run: |
         .\premake5.exe vs2022
 
-    # 7. Build MenuMap configurations (Errors are ignored per-step so others can run)
+    # 7. Build MenuMap configurations (Errors are isolated per-game so others can continue)
     - name: Build MenuMap (San Andreas)
       continue-on-error: true
       run: |
@@ -80,12 +89,38 @@ jobs:
       run: |
         msbuild project_files/menu-map.sln /p:Configuration=ReleaseIII /p:Platform=Win32 /m /verbosity:minimal
 
-    # 8. Collect and Upload your compiled plugins (.asi files)
-    # 'if: always()' ensures this still runs even if individual builds failed above
-    - name: Upload Finished ASI Plugins
+    # 8. Compress each successfully compiled .asi file into its own dedicated zip archive
+    - name: Package Plugins into Individual Zips
+      if: always()
+      shell: powershell
+      run: |
+        if (Test-Path "output/asi") {
+            Get-ChildItem -Path "output/asi" -Filter *.asi | ForEach-Object {
+                $zipName = "output/asi/$($_.BaseName).zip"
+                echo "Archiving $($_.Name) into $zipName..."
+                Compress-Archive -Path $_.FullName -DestinationPath $zipName -Force
+            }
+        }
+
+    # 9. Collect and Upload individual zip files as an Actions Run artifact
+    - name: Upload Finished ASI Plugins Artifact
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: menu-map latest
+        name: MenuMap-ASI-Plugins
         path: |
-          output/asi/*.asi
+          output/asi/*.zip
+
+    # 10. Automatically create a Release and upload individual zip files to the Releases Tab
+    - name: Create GitHub Release
+      if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "output/asi/*.zip"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+        name: ${{ github.ref_type == 'tag' && github.ref_name || format('Automated Build #{0}', github.run_number) }}
+        body: "Automated compiler build for Menu Map (GTA III, Vice City, San Andreas)."
+        allowUpdates: true
+        draft: false
+        prerelease: false
