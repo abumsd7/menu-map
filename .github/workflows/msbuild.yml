@@ -14,52 +14,70 @@ jobs:
     steps:
     # 1. Checkout your menu-map repository
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
 
-    # 2. Clone the Plugin-SDK dependency
+    # 2. Clone the Plugin-SDK dependency into a subfolder
     - name: Checkout Plugin-SDK
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: 'DK22Pac/plugin-sdk'
         path: 'plugin-sdk'
+        submodules: recursive
 
     # 3. Setup MSBuild (Visual Studio 2022 tools)
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
+      uses: microsoft/setup-msbuild@v3
 
-    # 4. Set up the PLUGIN_SDK_DIR environment variable
-    - name: Set Plugin-SDK Environment Variable
+    # 4. Generate and compile the Plugin-SDK Libraries using their exact internal flags
+    - name: Generate and Build Plugin-SDK Libraries
+      shell: cmd
+      run: |
+        cd plugin-sdk
+        set PLUGIN_SDK_DIR=%CD%
+        
+        echo ::group::Generate Plugin-SDK Solution
+        call "tools\generate\Visual Studio.bat"
+        echo ::groupEnd::
+        
+        echo ::group::Build SDK GTA III static lib
+        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_iii /m /verbosity:minimal
+        echo ::groupEnd::
+        
+        echo ::group::Build SDK GTA VC static lib
+        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_vc /m /verbosity:minimal
+        echo ::groupEnd::
+        
+        echo ::group::Build SDK GTA SA static lib
+        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_sa /m /verbosity:minimal
+        echo ::groupEnd::
+
+    # 5. Set up environment variables globally for the Menu Map build process
+    - name: Set Environment Variables
       run: |
         echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" >> $GITHUB_ENV
         [Environment]::SetEnvironmentVariable("PLUGIN_SDK_DIR", "${{ github.workspace }}\plugin-sdk", "User")
 
-    # 5. Compile Plugin-SDK components (Required for your project's 'links' filter)
-    # This generates the static .lib files your project links against.
-    - name: Build Plugin-SDK Libraries
-      run: |
-        msbuild plugin-sdk/plugin_sdk.sln /p:Configuration=Release /p:Platform=Win32 /m
-
-    # 6. Run Premake to generate project files inside "project_files"
-    - name: Run Premake
+    # 6. Run your root Premake to generate your project files
+    - name: Run Project Premake
       run: |
         .\premake5.exe vs2022
 
-    # 7. Build all three configurations (San Andreas, Vice City, GTA III)
+    # 7. Build MenuMap configurations using your local premake5.lua specifications
     - name: Build MenuMap (San Andreas)
       run: |
-        msbuild project_files/menu-map.sln /p:Configuration=ReleaseSA /p:Platform=Win32 /m
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseSA /p:Platform=Win32 /m /verbosity:minimal
 
     - name: Build MenuMap (Vice City)
       run: |
-        msbuild project_files/menu-map.sln /p:Configuration=ReleaseVC /p:Platform=Win32 /m
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseVC /p:Platform=Win32 /m /verbosity:minimal
 
     - name: Build MenuMap (GTA III)
       run: |
-        msbuild project_files/menu-map.sln /p:Configuration=ReleaseIII /p:Platform=Win32 /m
+        msbuild project_files/menu-map.sln /p:Configuration=ReleaseIII /p:Platform=Win32 /m /verbosity:minimal
 
-    # 8. Collect and Upload compiled .asi binaries from your target directory
+    # 8. Collect and Upload your compiled plugins (.asi files)
     - name: Upload Finished ASI Plugins
       uses: actions/upload-artifact@v4
       with:
