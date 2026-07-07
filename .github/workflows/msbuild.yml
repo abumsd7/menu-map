@@ -119,7 +119,7 @@ jobs:
         artifacts: "output/asi/*.zip"
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
-        name: ${{ github.ref_type == 'tag' && github.ref_name || format('Automated Build #{0}', github.run_number) }}
+        name: ${{ github.ref_type == 'tag' && github.ref_name || format('Automated Build {0}', github.run_number) }}
         body: "Automated compiler build for Menu Map (GTA III, Vice City, San Andreas)."
         allowUpdates: true
         draft: false
