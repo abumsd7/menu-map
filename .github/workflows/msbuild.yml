@@ -30,7 +30,7 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v3
 
-    # 4. Generate and compile the Plugin-SDK Libraries using their exact internal flags
+    # 4. Generate and compile the Release Plugin-SDK Libraries
     - name: Generate and Build Plugin-SDK Libraries
       shell: cmd
       run: |
@@ -42,15 +42,15 @@ jobs:
         echo ::groupEnd::
         
         echo ::group::Build SDK GTA III static lib
-        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_iii /m /verbosity:minimal
+        msbuild plugin.sln /property:Configuration=Release /property:Platform="Mixed Platforms" /target:plugin_iii /m /verbosity:minimal
         echo ::groupEnd::
         
         echo ::group::Build SDK GTA VC static lib
-        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_vc /m /verbosity:minimal
+        msbuild plugin.sln /property:Configuration=Release /property:Platform="Mixed Platforms" /target:plugin_vc /m /verbosity:minimal
         echo ::groupEnd::
         
         echo ::group::Build SDK GTA SA static lib
-        msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_sa /m /verbosity:minimal
+        msbuild plugin.sln /property:Configuration=Release /property:Platform="Mixed Platforms" /target:plugin_sa /m /verbosity:minimal
         echo ::groupEnd::
 
     # 5. Set up the environment variable cleanly for MSBuild across subsequent steps
