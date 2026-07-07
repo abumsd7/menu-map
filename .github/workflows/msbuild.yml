@@ -53,11 +53,11 @@ jobs:
         msbuild plugin.sln /property:Configuration=zDebug /property:Platform="Mixed Platforms" /target:plugin_sa /m /verbosity:minimal
         echo ::groupEnd::
 
-    # 5. Set up environment variables globally for the Menu Map build process
+    # 5. Set up the environment variable cleanly for MSBuild across subsequent steps
     - name: Set Environment Variables
+      shell: powershell
       run: |
-        echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" >> $GITHUB_ENV
-        [Environment]::SetEnvironmentVariable("PLUGIN_SDK_DIR", "${{ github.workspace }}\plugin-sdk", "User")
+        echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     # 6. Run your root Premake to generate your project files
     - name: Run Project Premake
