@@ -1,0 +1,60 @@
+name: Build Menu Map
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows you to manually trigger the build from GitHub UI
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+    # 1. Checkout your menu-map repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive # Set to true if you are using git submodules
+
+    # 2. Clone the Plugin-SDK dependency
+    - name: Checkout Plugin-SDK
+      uses: actions/checkout@v4
+      with:
+        repository: 'DK22Pac/plugin-sdk'
+        path: 'plugin-sdk'
+
+    # 3. Setup MSBuild (Visual Studio 2022 tools)
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    # 4. Set up the PLUGIN_SDK_DIR environment variable
+    # Plugin-SDK relies on this environment variable to locate its paths.
+    - name: Set Plugin-SDK Environment Variable
+      run: |
+        echo "PLUGIN_SDK_DIR=${{ github.workspace }}\plugin-sdk" >> $GITHUB_ENV
+        # If your premake script expects it as a system variable immediately:
+        [Environment]::SetEnvironmentVariable("PLUGIN_SDK_DIR", "${{ github.workspace }}\plugin-sdk", "User")
+
+    # 5. Run Premake to generate Visual Studio 2022 solution files
+    # Note: This assumes 'premake5.exe' is committed into your repo.
+    # If your command differs (e.g. vs2019/vs2022), adjust appropriately.
+    - name: Run Premake
+      run: |
+        .\premake5.exe vs2022
+      # If your premake5.exe is in a subfolder, change it to: .\path\to\premake5.exe vs2022
+
+    # 6. Build the generated solution via MSBuild
+    # Replace 'YourSolutionName.sln' with your actual .sln file name.
+    - name: Build with MSBuild
+      run: |
+        msbuild menu-map.sln /p:Configuration=Release /p:Platform=Win32
+
+    # 7. (Optional) Upload the compiled .asi / .dll file as an artifact
+    - name: Upload Artifact
+      uses: actions/artifacts@v4 # Note: Use 'actions/upload-artifact@v4' if this throws an action resolution error
+      with:
+        name: MenuMap-Build
+        path: |
+          **/*.asi
