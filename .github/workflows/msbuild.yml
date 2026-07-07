@@ -51,9 +51,9 @@ jobs:
       run: |
         msbuild menu-map.sln /p:Configuration=Release /p:Platform=Win32
 
-    # 7. (Optional) Upload the compiled .asi / .dll file as an artifact
+    # 7. Upload the compiled .asi / .dll file as an artifact
     - name: Upload Artifact
-      uses: actions/artifacts@v4 # Note: Use 'actions/upload-artifact@v4' if this throws an action resolution error
+      uses: actions/upload-artifact@v4
       with:
         name: MenuMap-Build
         path: |
